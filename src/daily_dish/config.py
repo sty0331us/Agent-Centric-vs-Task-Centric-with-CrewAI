@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     )
     openai_model_name: str = Field(default="gpt-4o-mini", alias="OPENAI_MODEL_NAME")
     enable_web_search: bool = Field(default=False, alias="DAILY_DISH_ENABLE_WEB_SEARCH")
+    max_query_chars: int = Field(default=500, alias="DAILY_DISH_MAX_QUERY_CHARS")
+    memory_turns: int = Field(default=3, alias="DAILY_DISH_MEMORY_TURNS")
 
     @field_validator("faq_pdf_path", mode="before")
     @classmethod

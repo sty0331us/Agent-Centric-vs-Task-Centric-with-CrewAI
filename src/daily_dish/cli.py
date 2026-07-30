@@ -17,6 +17,7 @@ from daily_dish.logging_setup import get_logger, setup_logging
 from daily_dish.runtime import ensure_local_storage
 from daily_dish.services import ChatService
 from daily_dish.services.chat import TurnResult
+from daily_dish.validation import sanitize_query
 
 console = Console()
 logger = get_logger(__name__)
@@ -125,12 +126,14 @@ def interactive_loop(mode: WorkflowMode, settings: Settings) -> None:
         if user_input.lower() == "exit":
             console.print("Thank you for chatting. Have a great day!")
             break
-        if not user_input:
-            console.print("[yellow]Please type a question.[/]")
+
+        validated = sanitize_query(user_input, max_chars=settings.max_query_chars)
+        if not validated.ok:
+            console.print(f"[yellow]{validated.error}[/]")
             continue
 
         try:
-            turn = service.ask(mode, user_input)
+            turn = service.ask(mode, validated.query)
             if mode is WorkflowMode.COMPARE:
                 _print_compare(mode, turn)
             else:
@@ -208,7 +211,11 @@ def main(argv: list[str] | None = None) -> None:
     logger.info("Starting Daily Dish chatbot in mode=%s", mode.value)
 
     if args.query:
-        result = run_once(mode, args.query, settings)
+        validated = sanitize_query(args.query, max_chars=settings.max_query_chars)
+        if not validated.ok:
+            console.print(f"[bold red]{validated.error}[/]")
+            raise SystemExit(2)
+        result = run_once(mode, validated.query, settings)
         if mode is not WorkflowMode.COMPARE:
             console.print(Panel(result, title="The Daily Dish Assistant", border_style="blue"))
         return
