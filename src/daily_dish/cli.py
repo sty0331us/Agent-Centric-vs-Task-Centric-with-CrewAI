@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import os
 import sys
-from typing import Any
 
 from dotenv import load_dotenv
 from rich.console import Console
@@ -13,9 +12,9 @@ from rich.panel import Panel
 from rich.table import Table
 
 from daily_dish.config import PROJECT_ROOT, Settings, WorkflowMode, get_settings
-from daily_dish.crews import build_agent_centric_crew, build_task_centric_crew
 from daily_dish.logging_setup import get_logger, setup_logging
 from daily_dish.runtime import ensure_local_storage
+from daily_dish.services import ChatService
 
 console = Console()
 logger = get_logger(__name__)
@@ -49,35 +48,20 @@ def _ensure_faq(settings: Settings) -> None:
     sys.exit(1)
 
 
-def _crew_result_text(result: Any) -> str:
-    if result is None:
-        return ""
-    if hasattr(result, "raw") and result.raw:
-        return str(result.raw).strip()
-    return str(result).strip()
+def _print_compare(service_result_mode: WorkflowMode, turn: object) -> None:
+    from daily_dish.services.chat import TurnResult
 
-
-def run_once(mode: WorkflowMode, customer_query: str, settings: Settings) -> str:
-    """Execute a single turn for the selected workflow mode."""
-    inputs = {"customer_query": customer_query}
-
-    if mode is WorkflowMode.AGENT_CENTRIC:
-        crew = build_agent_centric_crew(settings)
-        return _crew_result_text(crew.kickoff(inputs=inputs))
-
-    if mode is WorkflowMode.TASK_CENTRIC:
-        crew = build_task_centric_crew(settings)
-        return _crew_result_text(crew.kickoff(inputs=inputs))
-
-    # COMPARE: run both and return a side-by-side summary
-    agent_out = _crew_result_text(build_agent_centric_crew(settings).kickoff(inputs=inputs))
-    task_out = _crew_result_text(build_task_centric_crew(settings).kickoff(inputs=inputs))
-
+    assert isinstance(turn, TurnResult)
     table = Table(title="Agent-Centric vs Task-Centric", show_lines=True)
     table.add_column("Aspect", style="bold cyan", width=18)
     table.add_column("Agent-Centric", overflow="fold")
     table.add_column("Task-Centric", overflow="fold")
-    table.add_row("Final reply", agent_out, task_out)
+    table.add_row("Final reply", turn.agent_centric_reply or "", turn.task_centric_reply or "")
+    table.add_row(
+        "Latency",
+        f"{(turn.agent_centric_latency_ms or 0):.0f} ms",
+        f"{(turn.task_centric_latency_ms or 0):.0f} ms",
+    )
     table.add_row(
         "Tool binding",
         "Tools on Agent; LLM chooses",
@@ -89,7 +73,14 @@ def run_once(mode: WorkflowMode, customer_query: str, settings: Settings) -> str
         "Retrieve → then format",
     )
     console.print(table)
-    return task_out
+
+
+def run_once(mode: WorkflowMode, customer_query: str, settings: Settings) -> str:
+    """Execute a single turn for the selected workflow mode."""
+    turn = ChatService(settings).ask(mode, customer_query)
+    if mode is WorkflowMode.COMPARE:
+        _print_compare(mode, turn)
+    return turn.reply
 
 
 def interactive_loop(mode: WorkflowMode, settings: Settings) -> None:
@@ -99,6 +90,7 @@ def interactive_loop(mode: WorkflowMode, settings: Settings) -> None:
         WorkflowMode.TASK_CENTRIC: "Task-Centric",
         WorkflowMode.COMPARE: "Compare (both)",
     }[mode]
+    service = ChatService(settings)
 
     console.print(
         Panel(
@@ -125,10 +117,16 @@ def interactive_loop(mode: WorkflowMode, settings: Settings) -> None:
             continue
 
         try:
-            result = run_once(mode, user_input, settings)
-            if mode is not WorkflowMode.COMPARE:
+            turn = service.ask(mode, user_input)
+            if mode is WorkflowMode.COMPARE:
+                _print_compare(mode, turn)
+            else:
                 console.print(
-                    Panel(result, title="The Daily Dish Assistant", border_style="blue")
+                    Panel(
+                        f"{turn.reply}\n\n[dim]{turn.latency_ms:.0f} ms[/]",
+                        title="The Daily Dish Assistant",
+                        border_style="blue",
+                    )
                 )
         except Exception as exc:  # noqa: BLE001 — surface runtime errors to the user
             logger.exception("Crew run failed")
