@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 
@@ -89,12 +90,18 @@ def run_doctor_command(settings: Settings) -> int:
     return 0 if doctor_passed(checks) else 1
 
 
-def run_once(mode: WorkflowMode, customer_query: str, settings: Settings) -> str:
+def run_once(
+    mode: WorkflowMode,
+    customer_query: str,
+    settings: Settings,
+    *,
+    render_compare: bool = True,
+) -> TurnResult:
     """Execute a single turn for the selected workflow mode."""
     turn = ChatService(settings).ask(mode, customer_query)
-    if mode is WorkflowMode.COMPARE:
+    if mode is WorkflowMode.COMPARE and render_compare:
         _print_compare(mode, turn)
-    return turn.reply
+    return turn
 
 
 def interactive_loop(mode: WorkflowMode, settings: Settings) -> None:
@@ -179,6 +186,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run preflight diagnostics (API key, FAQ, packages, storage) and exit.",
     )
     parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit machine-readable JSON for single-query runs (implies -q).",
+    )
+    parser.add_argument(
         "--log-level",
         default=None,
         help="Override log level (DEBUG, INFO, WARNING, ERROR).",
@@ -210,14 +222,31 @@ def main(argv: list[str] | None = None) -> None:
     mode = WorkflowMode(args.mode) if args.mode else settings.default_mode
     logger.info("Starting Daily Dish chatbot in mode=%s", mode.value)
 
+    if args.json and not args.query:
+        console.print("[bold red]--json requires --query / -q[/]")
+        raise SystemExit(2)
+
     if args.query:
         validated = sanitize_query(args.query, max_chars=settings.max_query_chars)
         if not validated.ok:
-            console.print(f"[bold red]{validated.error}[/]")
+            if args.json:
+                print(json.dumps({"ok": False, "error": validated.error}))
+            else:
+                console.print(f"[bold red]{validated.error}[/]")
             raise SystemExit(2)
-        result = run_once(mode, validated.query, settings)
+        turn = run_once(mode, validated.query, settings, render_compare=not args.json)
+        if args.json:
+            # Avoid double-printing the Rich compare table noise for JSON consumers
+            print(json.dumps({"ok": True, **turn.to_dict()}, ensure_ascii=False, indent=2))
+            return
         if mode is not WorkflowMode.COMPARE:
-            console.print(Panel(result, title="The Daily Dish Assistant", border_style="blue"))
+            console.print(
+                Panel(
+                    f"{turn.reply}\n\n[dim]{turn.latency_ms:.0f} ms[/]",
+                    title="The Daily Dish Assistant",
+                    border_style="blue",
+                )
+            )
         return
 
     interactive_loop(mode, settings)
