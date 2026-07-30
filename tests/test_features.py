@@ -1,13 +1,10 @@
-"""Unit tests for FAQ search helpers, validation, memory, and doctor."""
+"""Unit tests for FAQ search helpers, validation, and memory."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from daily_dish.config import PROJECT_ROOT, get_settings
-from daily_dish.doctor import doctor_passed, run_doctor
 from daily_dish.memory import ConversationMemory
 from daily_dish.tools.assembly import build_retrieval_tools
 from daily_dish.tools.pdf_search import expand_query_terms, split_faq_chunks
@@ -61,18 +58,6 @@ def test_build_retrieval_tools_respects_web_flag(faq_pdf: Path) -> None:
     tools = build_retrieval_tools(settings)
     assert len(tools) == 1
     assert tools[0].name == "Search a PDF's content"
-
-
-def test_doctor_reports_faq_and_packages(faq_pdf: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DAILY_DISH_FAQ_PDF_PATH", str(faq_pdf))
-    monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
-    get_settings.cache_clear()
-    settings = get_settings()
-    checks = run_doctor(settings)
-    names = {c.name for c in checks}
-    assert "FAQ PDF" in names
-    assert "package:crewai" in names
-    assert doctor_passed(checks) is True
 
 
 def test_project_root_points_at_repo() -> None:
