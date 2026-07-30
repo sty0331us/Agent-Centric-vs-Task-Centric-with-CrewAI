@@ -1,6 +1,6 @@
 # Agent-Centric vs Task-Centric with CrewAI
 
-Production-oriented reference for building a **customer-service chatbot** with [CrewAI](https://www.crewai.com/), focused on a decision that separates demos from production systems:
+Production-oriented reference for building a **customer-service chatbot** with [CrewAI](https://www.crewai.com/).
 
 > **Where should tools live — on the Agent, or on the Task?**
 
@@ -314,7 +314,7 @@ You built a customer-service chatbot and, more importantly, exercised a fundamen
 - **Agent-centric** — flexible and easy; relies on the agent’s reasoning to select tools; can be inefficient or unpredictable as workflows grow.
 - **Task-centric** — structured and robust; tools map to the tasks that need them; clearer, more deterministic, easier to secure.
 
-Mastering the task-centric method is a practical step toward **professional, production-grade** multi-agent systems with CrewAI — not just another toy demo.
+Mastering the task-centric method is a practical step toward **professional, production-grade** multi-agent systems with CrewAI.
 
 ---
 
