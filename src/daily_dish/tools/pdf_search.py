@@ -59,7 +59,7 @@ def split_faq_chunks(text: str) -> list[str]:
     Prefers numbered FAQ entries; falls back to paragraph splits.
     """
     numbered = re.split(r"(?=\b\d+\.\s)", text)
-    chunks = [c.strip() for c in numbered if len(c.strip()) > 40]
+    chunks = [c.strip() for c in numbered if len(c.strip()) > 20]
     if len(chunks) >= 2:
         return chunks
 

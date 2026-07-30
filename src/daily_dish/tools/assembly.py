@@ -5,7 +5,8 @@ from __future__ import annotations
 from crewai.tools import BaseTool
 
 from daily_dish.config import Settings
-from daily_dish.tools import build_pdf_search_tool, build_web_search_tool
+from daily_dish.tools.pdf_search import build_pdf_search_tool
+from daily_dish.tools.web_search import build_web_search_tool
 
 
 def build_retrieval_tools(settings: Settings) -> list[BaseTool]:
