@@ -13,7 +13,6 @@ from rich.panel import Panel
 from rich.table import Table
 
 from daily_dish.config import PROJECT_ROOT, Settings, WorkflowMode, get_settings
-from daily_dish.doctor import doctor_passed, run_doctor
 from daily_dish.logging_setup import get_logger, setup_logging
 from daily_dish.memory import ConversationMemory
 from daily_dish.runtime import ensure_local_storage
@@ -75,20 +74,6 @@ def _print_compare(_mode: WorkflowMode, turn: TurnResult) -> None:
         "Retrieve → then format",
     )
     console.print(table)
-
-
-def run_doctor_command(settings: Settings) -> int:
-    """Print preflight diagnostics and return a process exit code."""
-    checks = run_doctor(settings)
-    table = Table(title="Daily Dish Doctor", show_lines=True)
-    table.add_column("Check", style="bold")
-    table.add_column("Status")
-    table.add_column("Detail", overflow="fold")
-    for check in checks:
-        status = "[green]OK[/]" if check.ok else "[red]FAIL[/]"
-        table.add_row(check.name, status, check.detail)
-    console.print(table)
-    return 0 if doctor_passed(checks) else 1
 
 
 def run_once(
@@ -191,11 +176,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Enable optional web-search tool (requires SERPER_API_KEY).",
     )
     parser.add_argument(
-        "--doctor",
-        action="store_true",
-        help="Run preflight diagnostics (API key, FAQ, packages, storage) and exit.",
-    )
-    parser.add_argument(
         "--json",
         action="store_true",
         help="Emit machine-readable JSON for single-query runs (implies -q).",
@@ -221,10 +201,6 @@ def main(argv: list[str] | None = None) -> None:
 
     level = args.log_level or settings.log_level
     setup_logging(level)
-
-    if args.doctor:
-        code = run_doctor_command(settings)
-        raise SystemExit(code)
 
     _ensure_api_key()
     _ensure_faq(settings)
