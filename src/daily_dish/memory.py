@@ -49,7 +49,8 @@ class ConversationMemory:
         return (
             f"{context}\n\n"
             f"Current customer question: {question}\n"
-            "Answer the current question. Use recent conversation only when it clarifies pronouns or follow-ups."
+            "Answer the current question. Use recent conversation only when it "
+            "clarifies pronouns or follow-ups."
         )
 
     def __len__(self) -> int:

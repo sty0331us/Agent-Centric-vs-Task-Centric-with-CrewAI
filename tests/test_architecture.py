@@ -6,30 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from daily_dish.config import PROJECT_ROOT, WorkflowMode, get_settings
+from daily_dish.config import WorkflowMode, get_settings
 from daily_dish.crews.agent_centric import build_agent_centric_crew
 from daily_dish.crews.task_centric import build_task_centric_crew
 from daily_dish.tools.pdf_search import LocalPdfSearchTool, build_pdf_search_tool
-
-
-@pytest.fixture(scope="session")
-def faq_pdf(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Ensure a FAQ PDF exists for tool tests (generate if missing)."""
-    packaged = PROJECT_ROOT / "data" / "faqs" / "daily_dish_faq.pdf"
-    if packaged.is_file():
-        return packaged
-
-    import importlib.util
-
-    script = PROJECT_ROOT / "scripts" / "generate_faq_pdf.py"
-    spec = importlib.util.spec_from_file_location("generate_faq_pdf", script)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
-    out = tmp_path_factory.mktemp("faq") / "daily_dish_faq.pdf"
-    src = PROJECT_ROOT / "data" / "faqs" / "daily_dish_faq.md"
-    return module.generate(src, out)
 
 
 def test_settings_defaults() -> None:
