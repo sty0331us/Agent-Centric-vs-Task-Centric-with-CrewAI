@@ -15,6 +15,7 @@ from rich.table import Table
 from daily_dish.config import PROJECT_ROOT, Settings, WorkflowMode, get_settings
 from daily_dish.doctor import doctor_passed, run_doctor
 from daily_dish.logging_setup import get_logger, setup_logging
+from daily_dish.memory import ConversationMemory
 from daily_dish.runtime import ensure_local_storage
 from daily_dish.services import ChatService
 from daily_dish.services.chat import TurnResult
@@ -112,12 +113,14 @@ def interactive_loop(mode: WorkflowMode, settings: Settings) -> None:
         WorkflowMode.COMPARE: "Compare (both)",
     }[mode]
     service = ChatService(settings)
+    memory = ConversationMemory(max_turns=settings.memory_turns)
 
     console.print(
         Panel(
             f"[bold]Welcome to The Daily Dish Chatbot![/]\n"
             f"Mode: [cyan]{mode_label}[/]\n"
-            "What would you like to know? (Type [yellow]exit[/] to quit)",
+            "What would you like to know? (Type [yellow]exit[/] to quit, "
+            "[yellow]reset[/] to clear memory)",
             title="The Daily Dish",
             border_style="green",
         )
@@ -130,9 +133,14 @@ def interactive_loop(mode: WorkflowMode, settings: Settings) -> None:
             console.print("\nThank you for chatting. Have a great day!")
             break
 
-        if user_input.lower() == "exit":
+        lowered = user_input.lower()
+        if lowered == "exit":
             console.print("Thank you for chatting. Have a great day!")
             break
+        if lowered == "reset":
+            memory.clear()
+            console.print("[cyan]Conversation memory cleared.[/]")
+            continue
 
         validated = sanitize_query(user_input, max_chars=settings.max_query_chars)
         if not validated.ok:
@@ -140,7 +148,8 @@ def interactive_loop(mode: WorkflowMode, settings: Settings) -> None:
             continue
 
         try:
-            turn = service.ask(mode, validated.query)
+            enriched = memory.enrich_query(validated.query)
+            turn = service.ask(mode, enriched)
             if mode is WorkflowMode.COMPARE:
                 _print_compare(mode, turn)
             else:
@@ -151,6 +160,7 @@ def interactive_loop(mode: WorkflowMode, settings: Settings) -> None:
                         border_style="blue",
                     )
                 )
+            memory.add(validated.query, turn.reply)
         except Exception as exc:  # noqa: BLE001 — surface runtime errors to the user
             logger.exception("Crew run failed")
             console.print(f"[bold red]An error occurred:[/] {exc}")
