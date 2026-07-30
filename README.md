@@ -39,19 +39,19 @@ Agent-centric is fine for prototypes. **Task-centric is the pattern you want whe
 ┌──────────────────────────────────────────────────────────────────────────┐
 │                         The Daily Dish Chatbot                           │
 │                                                                          │
-│   CLI / REPL  ──►  Settings (.env)  ──►  Crew factory (mode select)       │
-│                                              │                           │
-│                         ┌────────────────────┴────────────────────┐      │
-│                         ▼                                         ▼      │
-│              Agent-Centric Crew                         Task-Centric Crew│
-│              (tools on Agent)                           (tools on Tasks) │
-│                         │                                         │      │
-│                         └──────────────┬──────────────────────────┘      │
-│                                        ▼                                 │
-│                         LocalPdfSearchTool (+ optional Web)              │
-│                                        │                                 │
-│                                        ▼                                 │
-│                         data/faqs/daily_dish_faq.pdf                     │
+│   CLI / REPL  ──►  validate + memory  ──►  ChatService                   │
+│                         │                       │                        │
+│                    Settings (.env)     ┌────────┴────────┐               │
+│                                        ▼                 ▼               │
+│                             Agent-Centric Crew   Task-Centric Crew       │
+│                             (tools on Agent)     (tools on Tasks)        │
+│                                        │                 │               │
+│                                        └────────┬────────┘               │
+│                                                 ▼                        │
+│                              LocalPdfSearchTool (+ optional Web)         │
+│                                                 │                        │
+│                                                 ▼                        │
+│                              data/faqs/daily_dish_faq.pdf                │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -60,15 +60,16 @@ Agent-centric is fine for prototypes. **Task-centric is the pattern you want whe
 ```mermaid
 flowchart LR
   U[Customer] -->|question| CLI[daily-dish CLI]
-  CLI --> CFG[Settings / .env]
-  CLI --> AC[Agent-Centric Crew]
-  CLI --> TC[Task-Centric Crew]
+  CLI --> VAL[Validate / Memory]
+  VAL --> SVC[ChatService]
+  SVC --> CFG[Settings / .env]
+  SVC --> AC[Agent-Centric Crew]
+  SVC --> TC[Task-Centric Crew]
   AC --> PDF[(FAQ PDF)]
   TC --> PDF
   AC -.->|optional| WEB[Web Search]
   TC -.->|optional| WEB
-  AC --> OUT[Customer reply]
-  TC --> OUT
+  SVC --> OUT[Customer reply + latency]
 ```
 
 ### Agent-centric flow (flexible, less deterministic)
@@ -133,6 +134,7 @@ That override is what makes least-privilege workflows practical.
 ├── README.md
 ├── pyproject.toml              # packaging, deps, scripts, tool config
 ├── .env.example                # secrets & runtime template
+├── .github/workflows/ci.yml    # lint + unit tests
 ├── data/faqs/
 │   ├── daily_dish_faq.md       # source of truth for FAQ content
 │   └── daily_dish_faq.pdf      # generated knowledge base (script)
@@ -141,14 +143,18 @@ That override is what makes least-privilege workflows practical.
 ├── src/daily_dish/
 │   ├── cli.py                  # production CLI + REPL
 │   ├── config.py               # pydantic-settings
+│   ├── doctor.py               # preflight diagnostics
+│   ├── memory.py               # short-term REPL memory
+│   ├── validation.py           # query sanitization
 │   ├── logging_setup.py
+│   ├── services/               # ChatService orchestration + latency
 │   ├── agents/                 # shared agent factory
 │   ├── crews/
 │   │   ├── agent_centric.py    # tools on Agent
 │   │   └── task_centric.py     # tools on Tasks
 │   ├── tools/                  # PDF + optional web search
 │   └── models/                 # structured response schemas
-└── tests/                      # architecture & tool unit tests (no LLM required)
+└── tests/                      # architecture & feature unit tests (no LLM required)
 ```
 
 ---
@@ -182,7 +188,15 @@ cp .env.example .env
 python scripts/generate_faq_pdf.py
 ```
 
-### 5. Run the chatbot
+### 5. Preflight check
+
+```bash
+python -m daily_dish --doctor
+# or
+make doctor
+```
+
+### 6. Run the chatbot
 
 **Task-centric (recommended / default):**
 
@@ -198,7 +212,7 @@ python -m daily_dish --mode task_centric
 python -m daily_dish --mode agent_centric
 ```
 
-**Side-by-side comparison:**
+**Side-by-side comparison (includes latency):**
 
 ```bash
 python -m daily_dish --mode compare -q "What are the timings?"
@@ -210,11 +224,17 @@ python -m daily_dish --mode compare -q "What are the timings?"
 python -m daily_dish --mode task_centric -q "Do you have happy hour?"
 ```
 
+**JSON for automation / scripts:**
+
+```bash
+python -m daily_dish --mode task_centric -q "Where are you located?" --json
+```
+
 Example session:
 
 ```text
 Welcome to The Daily Dish Chatbot!
-What would you like to know? (Type 'exit' to quit)
+What would you like to know? (Type 'exit' to quit, 'reset' to clear memory)
 
 Your question: What are the timings?
 --- The Daily Dish Assistant ---
@@ -224,6 +244,16 @@ Your question: What are the timings?
 Your question: exit
 Thank you for chatting. Have a great day!
 ```
+
+### Production CLI extras
+
+| Flag / command | Purpose |
+| --- | --- |
+| `--doctor` | Validate API key, FAQ PDF, packages, and storage |
+| `--json` | Machine-readable turn output (requires `-q`) |
+| `--mode compare` | Run both crews and show reply + latency side-by-side |
+| `reset` (REPL) | Clear short-term conversation memory |
+| Query sanitization | Strips control chars and enforces `DAILY_DISH_MAX_QUERY_CHARS` |
 
 ---
 
