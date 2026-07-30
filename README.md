@@ -143,7 +143,6 @@ That override is what makes least-privilege workflows practical.
 ├── src/daily_dish/
 │   ├── cli.py                  # production CLI + REPL
 │   ├── config.py               # pydantic-settings
-│   ├── doctor.py               # preflight diagnostics
 │   ├── memory.py               # short-term REPL memory
 │   ├── validation.py           # query sanitization
 │   ├── logging_setup.py
@@ -188,15 +187,7 @@ cp .env.example .env
 python scripts/generate_faq_pdf.py
 ```
 
-### 5. Preflight check
-
-```bash
-python -m daily_dish --doctor
-# or
-make doctor
-```
-
-### 6. Run the chatbot
+### 5. Run the chatbot
 
 **Task-centric (recommended / default):**
 
@@ -249,7 +240,6 @@ Thank you for chatting. Have a great day!
 
 | Flag / command | Purpose |
 | --- | --- |
-| `--doctor` | Validate API key, FAQ PDF, packages, and storage |
 | `--json` | Machine-readable turn output (requires `-q`) |
 | `--mode compare` | Run both crews and show reply + latency side-by-side |
 | `reset` (REPL) | Clear short-term conversation memory |
