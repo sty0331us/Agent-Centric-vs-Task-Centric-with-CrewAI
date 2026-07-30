@@ -12,7 +12,7 @@ from crewai import Crew, Process, Task
 from daily_dish.agents import build_customer_service_agent
 from daily_dish.config import Settings, get_settings
 from daily_dish.runtime import ensure_local_storage
-from daily_dish.tools import build_pdf_search_tool, build_web_search_tool
+from daily_dish.tools import build_retrieval_tools
 
 
 def build_task_centric_crew(settings: Settings | None = None) -> Crew:
@@ -27,10 +27,7 @@ def build_task_centric_crew(settings: Settings | None = None) -> Crew:
     """
     ensure_local_storage()
     cfg = settings or get_settings()
-    pdf_tool = build_pdf_search_tool(cfg.faq_pdf_path)
-    retrieval_tools = [pdf_tool]
-    if cfg.enable_web_search:
-        retrieval_tools.append(build_web_search_tool())
+    retrieval_tools = build_retrieval_tools(cfg)
 
     # Agent has NO tools — capability is granted per task instead.
     agent = build_customer_service_agent(tools=[], settings=cfg)
